@@ -23,25 +23,26 @@ class Filosofo(threading.Thread):
     Cada filósofo é uma thread independente.
     """
     
-    def __init__(self, id, talher_esquerdo, talher_direito):
+    def __init__(self, philosopher_id, talher_esquerdo, talher_direito, max_refeicoes=3):
         """
         Inicializa um filósofo.
         
         Args:
-            id: Identificador do filósofo (0-4)
+            philosopher_id: Identificador do filósofo (0-4)
             talher_esquerdo: Lock representando o talher à esquerda
             talher_direito: Lock representando o talher à direita
+            max_refeicoes: Número máximo de refeições (padrão: 3)
         """
-        threading.Thread.__init__(self)
-        self.id = id
+        super().__init__()
+        self.philosopher_id = philosopher_id
         self.talher_esquerdo = talher_esquerdo
         self.talher_direito = talher_direito
         self.refeicoes = 0
-        self.max_refeicoes = 3  # Cada filósofo come 3 vezes
+        self.max_refeicoes = max_refeicoes
         
     def pensar(self):
         """Filósofo está pensando."""
-        print(f"Filósofo {self.id} está pensando...")
+        print(f"Filósofo {self.philosopher_id} está pensando...")
         time.sleep(random.uniform(0.1, 0.5))
         
     def pegar_talheres(self):
@@ -49,7 +50,7 @@ class Filosofo(threading.Thread):
         Filósofo tenta pegar os dois talheres.
         Para evitar deadlock, os filósofos ímpares pegam primeiro o talher direito.
         """
-        if self.id % 2 == 0:
+        if self.philosopher_id % 2 == 0:
             # Filósofos pares pegam primeiro o talher esquerdo
             primeiro_talher = self.talher_esquerdo
             segundo_talher = self.talher_direito
@@ -59,39 +60,50 @@ class Filosofo(threading.Thread):
             segundo_talher = self.talher_esquerdo
             
         primeiro_talher.acquire()
-        print(f"Filósofo {self.id} pegou o primeiro talher")
+        print(f"Filósofo {self.philosopher_id} pegou o primeiro talher")
         
-        segundo_talher.acquire()
-        print(f"Filósofo {self.id} pegou o segundo talher")
+        try:
+            segundo_talher.acquire()
+            print(f"Filósofo {self.philosopher_id} pegou o segundo talher")
+        except:
+            # Se falhar ao pegar o segundo talher, libera o primeiro
+            primeiro_talher.release()
+            raise
         
     def comer(self):
         """Filósofo está comendo."""
-        print(f"Filósofo {self.id} está comendo (refeição {self.refeicoes + 1}/{self.max_refeicoes})")
+        print(f"Filósofo {self.philosopher_id} está comendo (refeição {self.refeicoes + 1}/{self.max_refeicoes})")
         time.sleep(random.uniform(0.2, 0.6))
         self.refeicoes += 1
         
     def devolver_talheres(self):
         """Filósofo devolve os dois talheres à mesa."""
         self.talher_direito.release()
-        print(f"Filósofo {self.id} devolveu o talher direito")
+        print(f"Filósofo {self.philosopher_id} devolveu o talher direito")
         
         self.talher_esquerdo.release()
-        print(f"Filósofo {self.id} devolveu o talher esquerdo")
+        print(f"Filósofo {self.philosopher_id} devolveu o talher esquerdo")
         
     def run(self):
         """
         Execução da thread do filósofo.
         Ciclo: pensar -> pegar talheres -> comer -> devolver talheres
         """
-        print(f"Filósofo {self.id} sentou-se à mesa")
+        print(f"Filósofo {self.philosopher_id} sentou-se à mesa")
         
-        while self.refeicoes < self.max_refeicoes:
-            self.pensar()
-            self.pegar_talheres()
-            self.comer()
-            self.devolver_talheres()
-            
-        print(f"Filósofo {self.id} terminou de comer e saiu da mesa")
+        try:
+            while self.refeicoes < self.max_refeicoes:
+                self.pensar()
+                self.pegar_talheres()
+                try:
+                    self.comer()
+                finally:
+                    self.devolver_talheres()
+        except Exception as e:
+            print(f"Filósofo {self.philosopher_id} encontrou um erro: {e}")
+            raise
+        finally:
+            print(f"Filósofo {self.philosopher_id} terminou de comer e saiu da mesa")
 
 
 def jantar_dos_filosofos():
